@@ -36,9 +36,16 @@ sudo systemctl enable postgresql
 echo "PostgreSQL installed and running!"
 
 # ============================================
-# 3. INSTALL NODE.JS
+# 3. INSTALL GIT
 # ============================================
-echo "[3/8] Installing Node.js via NVM..."
+echo "[3/8] Installing Git..."
+sudo yum install git -y
+echo "Git $(git --version) installed!"
+
+# ============================================
+# 4. INSTALL NODE.JS
+# ============================================
+echo "[4/8] Installing Node.js via NVM..."
 if [ ! -d "$HOME/.nvm" ]; then
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
     export NVM_DIR="$HOME/.nvm"
@@ -56,9 +63,9 @@ echo "Node.js $(node --version) installed!"
 echo "npm $(npm --version) installed!"
 
 # ============================================
-# 4. CLONE GITHUB REPOSITORY
+# 5. CLONE GITHUB REPOSITORY
 # ============================================
-echo "[4/8] Cloning GitHub repository..."
+echo "[5/8] Cloning GitHub repository..."
 cd ~
 REPO_DIR="$HOME/rutag-app-admin"
 
@@ -72,15 +79,15 @@ else
 fi
 
 # ============================================
-# 5. INSTALL NPM DEPENDENCIES
+# 6. INSTALL NPM DEPENDENCIES
 # ============================================
-echo "[5/8] Installing npm dependencies..."
+echo "[6/8] Installing npm dependencies..."
 npm install
 
 # ============================================
-# 6. CONFIGURE POSTGRESQL DATABASE
+# 7. CONFIGURE POSTGRESQL DATABASE
 # ============================================
-echo "[6/8] Setting up PostgreSQL database..."
+echo "[7/8] Setting up PostgreSQL database..."
 
 # Configure pg_hba.conf to allow local connections
 sudo bash -c 'cat > /var/lib/pgsql/data/pg_hba.conf << EOF
@@ -119,9 +126,9 @@ sudo -u postgres psql -d sensor_db -f "$REPO_DIR/database-schema.sql"
 echo "PostgreSQL database configured!"
 
 # ============================================
-# 7. CREATE ENVIRONMENT FILE
+# 8. CREATE ENVIRONMENT FILE
 # ============================================
-echo "[7/8] Creating environment configuration..."
+echo "[8/8] Creating environment configuration..."
 
 cat > "$REPO_DIR/.env" << EOF
 # Server Configuration
@@ -138,9 +145,9 @@ EOF
 echo ".env file created!"
 
 # ============================================
-# 8. INSTALL AND CONFIGURE PM2
+# 9. INSTALL AND CONFIGURE PM2
 # ============================================
-echo "[8/8] Setting up PM2 process manager..."
+echo "[9/9] Setting up PM2 process manager..."
 
 npm install -g pm2
 
