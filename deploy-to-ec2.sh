@@ -23,10 +23,12 @@ sudo yum update -y
 echo "[2/8] Installing PostgreSQL..."
 sudo yum install postgresql15-server postgresql15 -y
 
-# Initialize PostgreSQL
+# Initialize PostgreSQL only if not already initialized
 if [ ! -f /var/lib/pgsql/data/PG_VERSION ]; then
     echo "Initializing PostgreSQL database..."
     sudo postgresql-setup --initdb
+else
+    echo "PostgreSQL already initialized, skipping..."
 fi
 
 # Start and enable PostgreSQL
