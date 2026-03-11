@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const session = require('express-session');
 const { Pool } = require('pg');
 const path = require('path');
 
@@ -20,14 +21,57 @@ const pool = new Pool({
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'change-this-secret-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    maxAge: 8 * 60 * 60 * 1000 // 8 hours
+  }
+}));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ============================================
+// AUTH MIDDLEWARE & ENDPOINTS
+// ============================================
+
+function requireAuth(req, res, next) {
+  if (req.session && req.session.authenticated) {
+    return next();
+  }
+  res.status(401).json({ error: 'Unauthorized' });
+}
+
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    req.session.authenticated = true;
+    req.session.username = username;
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: 'Invalid credentials' });
+  }
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ success: true });
+});
+
+app.get('/api/auth/status', (req, res) => {
+  res.json({ authenticated: !!(req.session && req.session.authenticated) });
+});
 
 // ============================================
 // DASHBOARD ENDPOINTS
 // ============================================
 
 // Get dashboard statistics
-app.get('/api/dashboard/stats', async (req, res) => {
+app.get('/api/dashboard/stats', requireAuth, async (req, res) => {
   try {
     const devicesQuery = 'SELECT COUNT(*) as count FROM devices';
     const usersQuery = 'SELECT COUNT(*) as count FROM app_users';
@@ -58,7 +102,7 @@ app.get('/api/dashboard/stats', async (req, res) => {
 // ============================================
 
 // Get all devices
-app.get('/api/devices', async (req, res) => {
+app.get('/api/devices', requireAuth, async (req, res) => {
   try {
     const query = `
       SELECT 
@@ -80,7 +124,7 @@ app.get('/api/devices', async (req, res) => {
 });
 
 // Toggle device status (restrict/allow data)
-app.put('/api/devices/:deviceId/toggle', async (req, res) => {
+app.put('/api/devices/:deviceId/toggle', requireAuth, async (req, res) => {
   const { deviceId } = req.params;
   
   try {
@@ -108,7 +152,7 @@ app.put('/api/devices/:deviceId/toggle', async (req, res) => {
 });
 
 // Update device details
-app.put('/api/devices/:deviceId', async (req, res) => {
+app.put('/api/devices/:deviceId', requireAuth, async (req, res) => {
   const { deviceId } = req.params;
   const { device_name, location } = req.body;
   
@@ -139,7 +183,7 @@ app.put('/api/devices/:deviceId', async (req, res) => {
 // ============================================
 
 // Get all app users
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', requireAuth, async (req, res) => {
   try {
     const query = `
       SELECT 
@@ -161,7 +205,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Toggle user block status
-app.put('/api/users/:userId/toggle-block', async (req, res) => {
+app.put('/api/users/:userId/toggle-block', requireAuth, async (req, res) => {
   const { userId } = req.params;
   
   try {

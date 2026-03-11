@@ -234,11 +234,138 @@
             margin-bottom: 20px;
             opacity: 0.3;
         }
+
+        /* LOGIN SCREEN */
+        #loginScreen {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #loginScreen.visible {
+            display: flex;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .login-card h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 6px;
+        }
+
+        .login-card p {
+            color: #657786;
+            font-size: 14px;
+            margin-bottom: 28px;
+        }
+
+        .login-field {
+            margin-bottom: 16px;
+        }
+
+        .login-field label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 6px;
+        }
+
+        .login-field input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .login-field input:focus {
+            border-color: #667eea;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: opacity 0.2s;
+        }
+
+        .login-btn:hover {
+            opacity: 0.9;
+        }
+
+        .login-error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            float: right;
+            transition: background 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
     </style>
 </head>
 <body>
+    <!-- LOGIN SCREEN -->
+    <div id="loginScreen">
+        <div class="login-card">
+            <h2>🔧 Admin Portal</h2>
+            <p>Sign in to manage devices and users</p>
+            <div class="login-error" id="loginError">Invalid username or password</div>
+            <div class="login-field">
+                <label>Username</label>
+                <input type="text" id="loginUsername" placeholder="admin" autocomplete="username" />
+            </div>
+            <div class="login-field">
+                <label>Password</label>
+                <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" />
+            </div>
+            <button class="login-btn" onclick="doLogin()">Sign In</button>
+        </div>
+    </div>
+
+    <div id="mainApp" style="display:none">
     <div class="header">
-        <h1>🔧 Sensor Admin Portal</h1>
+        <h1 style="display:inline">🔧 Sensor Admin Portal</h1>
+        <button class="logout-btn" onclick="doLogout()">Logout</button>
     </div>
 
     <div class="container">
@@ -311,10 +438,80 @@
                 </table>
             </div>
         </div>
-    </div>
+    </div> <!-- end mainApp -->
 
     <script>
         const API_BASE = window.location.origin + '/api';
+
+        // ---- AUTH ----
+        async function checkAuth() {
+            const res = await fetch(`${API_BASE}/auth/status`);
+            const data = await res.json();
+            if (data.authenticated) {
+                showApp();
+            } else {
+                showLogin();
+            }
+        }
+
+        function showLogin() {
+            document.getElementById('loginScreen').classList.add('visible');
+            document.getElementById('mainApp').style.display = 'none';
+        }
+
+        function showApp() {
+            document.getElementById('loginScreen').classList.remove('visible');
+            document.getElementById('mainApp').style.display = 'block';
+            loadDashboard();
+        }
+
+        async function doLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errorEl = document.getElementById('loginError');
+            errorEl.style.display = 'none';
+
+            try {
+                const res = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (res.ok) {
+                    showApp();
+                } else {
+                    errorEl.style.display = 'block';
+                }
+            } catch (e) {
+                errorEl.textContent = 'Connection error. Try again.';
+                errorEl.style.display = 'block';
+            }
+        }
+
+        async function doLogout() {
+            await fetch(`${API_BASE}/logout`, { method: 'POST' });
+            document.getElementById('loginUsername').value = '';
+            document.getElementById('loginPassword').value = '';
+            showLogin();
+        }
+
+        // Allow Enter key on login form
+        document.getElementById('loginPassword').addEventListener('keydown', e => {
+            if (e.key === 'Enter') doLogin();
+        });
+        document.getElementById('loginUsername').addEventListener('keydown', e => {
+            if (e.key === 'Enter') doLogin();
+        });
+
+        // If API returns 401, redirect to login
+        const _origFetch = window.fetch;
+        window.fetch = async function(...args) {
+            const res = await _origFetch(...args);
+            if (res.status === 401 && !args[0].toString().includes('/api/login')) {
+                showLogin();
+            }
+            return res;
+        };
 
         // Tab switching
         function switchTab(tabName) {
@@ -465,8 +662,8 @@
             }
         }
 
-        // Initialize dashboard on load
-        loadDashboard();
+        // Initialize — check if already logged in
+        checkAuth();
         
         // Auto-refresh dashboard every 30 seconds
         setInterval(() => {
