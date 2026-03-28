@@ -43,6 +43,21 @@ function requireAuth(req, res, next) {
   res.status(401).json({ error: 'Unauthorized' });
 }
 
+function requireApiKey(req, res, next) {
+  const apiKey = req.headers['x-api-key'];
+  const expectedApiKey = process.env.API_KEY;
+
+  if (!expectedApiKey) {
+    return res.status(503).json({ error: 'API key not configured on server' });
+  }
+
+  if (!apiKey || apiKey !== expectedApiKey) {
+    return res.status(403).json({ error: 'Invalid API key' });
+  }
+
+  return next();
+}
+
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
@@ -64,6 +79,48 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/auth/status', (req, res) => {
   res.json({ authenticated: !!(req.session && req.session.authenticated) });
+});
+
+app.post('/api/users/sync', async (req, res) => {
+  try {
+    const { userId, email, displayName } = req.body;
+
+    if (!userId || !email) {
+      return res.status(400).json({
+        error: 'Missing required fields: userId, email'
+      });
+    }
+
+    const query = `
+      INSERT INTO app_users (user_id, email, display_name, is_blocked, last_login, created_at, updated_at)
+      VALUES ($1, $2, $3, false, NOW(), NOW(), NOW())
+      ON CONFLICT (user_id) DO UPDATE
+      SET email = EXCLUDED.email,
+          display_name = COALESCE(EXCLUDED.display_name, app_users.display_name),
+          last_login = NOW(),
+          updated_at = NOW()
+      RETURNING user_id, email, display_name, is_blocked, created_at, last_login, updated_at
+    `;
+
+    const result = await pool.query(query, [userId, email, displayName || email]);
+
+    res.json({
+      success: true,
+      message: 'User synced successfully',
+      user: result.rows[0]
+    });
+  } catch (error) {
+    console.error('User sync error:', error);
+
+    if (error.code === '23505' && error.constraint === 'app_users_email_key') {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+
+    res.status(500).json({
+      error: 'Failed to sync user',
+      message: error.message
+    });
+  }
 });
 
 // ============================================
@@ -229,6 +286,89 @@ app.put('/api/users/:userId/toggle-block', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Toggle user block error:', error);
     res.status(500).json({ error: 'Failed to toggle user block status' });
+  }
+});
+
+app.get('/api/check-device/:deviceId', requireApiKey, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const result = await pool.query(
+      'SELECT device_id, device_name, is_active, location, last_seen FROM devices WHERE device_id = $1',
+      [deviceId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({
+        hasAccess: false,
+        registered: false,
+        reason: 'Device is not registered'
+      });
+    }
+
+    if (result.rows[0].is_active !== true) {
+      return res.json({
+        hasAccess: false,
+        registered: true,
+        reason: 'Device is restricted',
+        device: result.rows[0]
+      });
+    }
+
+    res.json({
+      hasAccess: true,
+      registered: true,
+      device: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Check device error:', error);
+    res.status(500).json({ error: 'Failed to check device status' });
+  }
+});
+
+app.get('/api/check-access/:userId/:deviceId', requireApiKey, async (req, res) => {
+  try {
+    const { userId, deviceId } = req.params;
+
+    const userResult = await pool.query(
+      'SELECT user_id, is_blocked FROM app_users WHERE user_id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length > 0 && userResult.rows[0].is_blocked === true) {
+      return res.json({
+        hasAccess: false,
+        reason: 'User is blocked'
+      });
+    }
+
+    const deviceResult = await pool.query(
+      'SELECT device_id, device_name, is_active, location, last_seen FROM devices WHERE device_id = $1',
+      [deviceId]
+    );
+
+    if (deviceResult.rows.length === 0) {
+      return res.json({
+        hasAccess: false,
+        reason: 'Device is not registered'
+      });
+    }
+
+    if (deviceResult.rows[0].is_active !== true) {
+      return res.json({
+        hasAccess: false,
+        reason: 'Device is restricted',
+        device: deviceResult.rows[0]
+      });
+    }
+
+    res.json({
+      hasAccess: true,
+      accessLevel: 'default',
+      device: deviceResult.rows[0]
+    });
+  } catch (error) {
+    console.error('Check access error:', error);
+    res.status(500).json({ error: 'Failed to check access' });
   }
 });
 
