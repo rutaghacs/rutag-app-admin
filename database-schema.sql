@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS app_users (
     user_id VARCHAR(255) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     display_name VARCHAR(255),
+    auth_provider VARCHAR(20) DEFAULT 'google',
     is_blocked BOOLEAN DEFAULT false,
     last_login TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW(),
@@ -55,10 +56,10 @@ INSERT INTO devices (device_id, device_name, location, is_active, last_seen) VAL
 ON CONFLICT (device_id) DO NOTHING;
 
 -- Insert sample users
-INSERT INTO app_users (user_id, email, display_name, is_blocked, last_login) VALUES
-('user-001', 'john.doe@example.com', 'John Doe', false, NOW()),
-('user-002', 'jane.smith@example.com', 'Jane Smith', false, NOW() - INTERVAL '1 day'),
-('user-003', 'blocked.user@example.com', 'Blocked User', true, NOW() - INTERVAL '7 days')
+INSERT INTO app_users (user_id, email, display_name, auth_provider, is_blocked, last_login) VALUES
+('user-001', 'john.doe@example.com', 'John Doe', 'password', false, NOW()),
+('user-002', 'jane.smith@example.com', 'Jane Smith', 'google', false, NOW() - INTERVAL '1 day'),
+('user-003', 'blocked.user@example.com', 'Blocked User', 'password', true, NOW() - INTERVAL '7 days')
 ON CONFLICT (user_id) DO NOTHING;
 
 -- ==================================

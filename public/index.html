@@ -180,6 +180,73 @@
             transform: scale(1.05);
         }
 
+        .btn-reset {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-reset:hover {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
+
+        .action-buttons {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .users-tools {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+
+        .users-tools h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #1f2937;
+        }
+
+        .create-user-form {
+            display: grid;
+            grid-template-columns: 2fr 2fr 2fr auto;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .create-user-form input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .create-user-form button {
+            background: #0f766e;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .create-user-form button:hover {
+            opacity: 0.92;
+        }
+
+        @media (max-width: 1024px) {
+            .create-user-form {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .status-badge {
             display: inline-block;
             padding: 4px 12px;
@@ -341,6 +408,38 @@
         .logout-btn:hover {
             background: rgba(255,255,255,0.3);
         }
+
+        .header-actions {
+            float: right;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .sync-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .sync-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .sync-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .sync-status {
+            font-size: 12px;
+            opacity: 0.95;
+        }
     </style>
 </head>
 <body>
@@ -365,7 +464,11 @@
     <div id="mainApp" style="display:none">
     <div class="header">
         <h1 style="display:inline">🔧 Sensor Admin Portal</h1>
-        <button class="logout-btn" onclick="doLogout()">Logout</button>
+        <div class="header-actions">
+            <span id="syncStatus" class="sync-status"></span>
+            <button class="sync-btn" id="syncBtn" onclick="manualSync()">Sync Data</button>
+            <button class="logout-btn" onclick="doLogout()">Logout</button>
+        </div>
     </div>
 
     <div class="container">
@@ -420,6 +523,15 @@
 
         <!-- USERS TAB -->
         <div id="users" class="tab-content">
+            <div class="users-tools">
+                <h3>Create Email/Password Account</h3>
+                <div class="create-user-form">
+                    <input type="email" id="createUserEmail" placeholder="user@example.com" />
+                    <input type="text" id="createUserDisplayName" placeholder="Display name" />
+                    <input type="password" id="createUserPassword" placeholder="Temporary password" />
+                    <button onclick="createPasswordAccount()">Create Account</button>
+                </div>
+            </div>
             <div class="table-container">
                 <table>
                     <thead>
@@ -427,13 +539,14 @@
                             <th>User ID</th>
                             <th>Email</th>
                             <th>Display Name</th>
+                            <th>Auth Type</th>
                             <th>Status</th>
                             <th>Last Login</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="usersTableBody">
-                        <tr><td colspan="6" class="loading">Loading users...</td></tr>
+                        <tr><td colspan="7" class="loading">Loading users...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -492,7 +605,45 @@
             await fetch(`${API_BASE}/logout`, { method: 'POST' });
             document.getElementById('loginUsername').value = '';
             document.getElementById('loginPassword').value = '';
+            document.getElementById('syncStatus').textContent = '';
             showLogin();
+        }
+
+        async function manualSync() {
+            const syncBtn = document.getElementById('syncBtn');
+            const syncStatus = document.getElementById('syncStatus');
+
+            syncBtn.disabled = true;
+            syncBtn.textContent = 'Syncing...';
+            syncStatus.textContent = 'Sync in progress';
+
+            try {
+                const response = await fetch(`${API_BASE}/sync/refresh`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to sync');
+                }
+
+                const userCount = result?.totals?.users ?? '-';
+                const deviceCount = result?.totals?.devices ?? '-';
+                syncStatus.textContent = `Synced. Users: ${userCount}, Devices: ${deviceCount}`;
+
+                await Promise.all([
+                    loadDashboard(),
+                    loadUsers(true),
+                    loadDevices(true)
+                ]);
+            } catch (error) {
+                console.error('Manual sync failed:', error);
+                syncStatus.textContent = 'Sync failed';
+                alert(`Sync failed: ${error.message || 'Unknown error'}`);
+            } finally {
+                syncBtn.disabled = false;
+                syncBtn.textContent = 'Sync Data';
+            }
         }
 
         // Allow Enter key on login form
@@ -545,9 +696,11 @@
         }
 
         // Load Devices
-        async function loadDevices() {
+        async function loadDevices(silent = false) {
             const tbody = document.getElementById('devicesTableBody');
-            tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading devices...</td></tr>';
+            if (!silent) {
+                tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading devices...</td></tr>';
+            }
 
             try {
                 const response = await fetch(`${API_BASE}/devices`);
@@ -604,16 +757,18 @@
         }
 
         // Load Users
-        async function loadUsers() {
+        async function loadUsers(silent = false) {
             const tbody = document.getElementById('usersTableBody');
-            tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading users...</td></tr>';
+            if (!silent) {
+                tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading users...</td></tr>';
+            }
 
             try {
                 const response = await fetch(`${API_BASE}/users`);
                 const users = await response.json();
 
                 if (users.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No users found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No users found</td></tr>';
                     return;
                 }
 
@@ -622,6 +777,7 @@
                         <td>${user.user_id}</td>
                         <td>${user.email}</td>
                         <td>${user.display_name || 'N/A'}</td>
+                        <td>${user.auth_provider === 'password' ? 'Email/Password' : 'Google'}</td>
                         <td>
                             <span class="status-badge ${user.is_blocked ? 'status-blocked' : 'status-unblocked'}">
                                 ${user.is_blocked ? 'Blocked' : 'Active'}
@@ -629,16 +785,92 @@
                         </td>
                         <td>${user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
                         <td>
-                            <button class="btn ${user.is_blocked ? 'btn-unblock' : 'btn-block'}" 
-                                    onclick="toggleUserBlock('${user.user_id}')">
-                                ${user.is_blocked ? 'Unblock' : 'Block'}
-                            </button>
+                            <div class="action-buttons">
+                                <button class="btn ${user.is_blocked ? 'btn-unblock' : 'btn-block'}" 
+                                        onclick="toggleUserBlock('${user.user_id}')">
+                                    ${user.is_blocked ? 'Unblock' : 'Block'}
+                                </button>
+                                ${user.auth_provider === 'password' ? `
+                                    <button class="btn btn-reset" onclick="generateResetLink('${user.user_id}', '${user.email}')">
+                                        Forgot Password
+                                    </button>
+                                ` : ''}
+                            </div>
                         </td>
                     </tr>
                 `).join('');
             } catch (error) {
                 console.error('Failed to load users:', error);
-                tbody.innerHTML = '<tr><td colspan="6" class="error">Failed to load users</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="error">Failed to load users</td></tr>';
+            }
+        }
+
+        async function createPasswordAccount() {
+            const email = document.getElementById('createUserEmail').value.trim().toLowerCase();
+            const displayName = document.getElementById('createUserDisplayName').value.trim();
+            const password = document.getElementById('createUserPassword').value;
+
+            if (!email || !password) {
+                alert('Email and password are required');
+                return;
+            }
+
+            if (password.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/users/create-password-account`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, displayName, password })
+                });
+
+                const result = await response.json();
+                if (!response.ok) {
+                    alert(result.error || 'Failed to create account');
+                    return;
+                }
+
+                alert(`Account created for ${result.user.email}`);
+                document.getElementById('createUserEmail').value = '';
+                document.getElementById('createUserDisplayName').value = '';
+                document.getElementById('createUserPassword').value = '';
+                loadUsers();
+                loadDashboard();
+            } catch (error) {
+                console.error('Create password account failed:', error);
+                alert('Failed to create account');
+            }
+        }
+
+        async function generateResetLink(userId, email) {
+            if (!confirm(`Generate password reset link for ${email}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/users/${userId}/generate-reset-link`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    alert(result.error || 'Failed to generate reset link');
+                    return;
+                }
+
+                const resetLink = result.resetLink;
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(resetLink);
+                    alert(`Reset link copied to clipboard for ${result.email}`);
+                } else {
+                    prompt(`Copy reset link for ${result.email}:`, resetLink);
+                }
+            } catch (error) {
+                console.error('Generate reset link failed:', error);
+                alert('Failed to generate reset link');
             }
         }
 
@@ -662,14 +894,28 @@
             }
         }
 
-        // Initialize — check if already logged in
+        // Initialize - check if already logged in
         checkAuth();
-        
-        // Auto-refresh dashboard every 30 seconds
+
+        // Auto-refresh visible data every 10 seconds
         setInterval(() => {
             const activeTab = document.querySelector('.tab-content.active').id;
-            if (activeTab === 'dashboard') loadDashboard();
-        }, 30000);
+            if (activeTab === 'dashboard') {
+                loadDashboard();
+                return;
+            }
+
+            if (activeTab === 'devices') {
+                loadDevices(true);
+                loadDashboard();
+                return;
+            }
+
+            if (activeTab === 'users') {
+                loadUsers(true);
+                loadDashboard();
+            }
+        }, 10000);
     </script>
 </body>
 </html>
