@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Precision IoT - Admin Portal Guide</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --teal: #0f766e;
+      --teal-dark: #115e59;
+      --teal-pale: #ecfeff;
+      --amber: #d97706;
+      --amber-pale: #fffbeb;
+      --red: #b91c1c;
+      --red-pale: #fef2f2;
+      --green: #15803d;
+      --green-pale: #f0fdf4;
+      --gray-100: #f5f7f8;
+      --gray-200: #dbe4e7;
+      --gray-400: #7b8794;
+      --gray-600: #475569;
+      --gray-800: #1f2937;
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      --radius: 16px;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(180deg, #eef6f6 0%, #f8fafc 100%); color: var(--gray-800); line-height: 1.65; }
+    a { color: var(--teal); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .page { display: flex; min-height: 100vh; }
+    .sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; width: 260px; min-width: 260px; background: #ffffff; border-right: 1px solid var(--gray-200); padding: 28px 0; }
+    .sidebar-logo { display: flex; align-items: center; gap: 12px; padding: 0 22px 24px; border-bottom: 1px solid var(--gray-200); margin-bottom: 10px; }
+    .sidebar-logo .icon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, var(--teal), var(--teal-dark)); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    .sidebar-logo span { font-weight: 700; color: var(--teal-dark); }
+    .nav-label { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gray-400); padding: 10px 22px 6px; }
+    .nav-item { display: block; padding: 9px 22px; font-size: 13.5px; font-weight: 600; color: var(--gray-600); border-left: 3px solid transparent; }
+    .nav-item:hover { background: var(--teal-pale); color: var(--teal-dark); }
+    .nav-item.active { background: var(--teal-pale); color: var(--teal-dark); border-left-color: var(--teal); }
+    .main { flex: 1; max-width: 960px; padding: 40px 30px; }
+    .hero { background: linear-gradient(135deg, var(--teal) 0%, #134e4a 100%); color: #fff; border-radius: var(--radius); padding: 44px 38px; margin-bottom: 28px; box-shadow: 0 12px 32px rgba(17, 94, 89, 0.24); }
+    .hero-top { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+    .hero .icon { width: 58px; height: 58px; border-radius: 14px; background: rgba(255,255,255,.14); display: flex; align-items: center; justify-content: center; font-size: 28px; }
+    .hero h1 { font-size: 32px; font-weight: 800; }
+    .hero p { max-width: 640px; color: rgba(255,255,255,.88); }
+    .hero-meta { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .hero-meta span { background: rgba(255,255,255,.14); padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .toc, .section { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); }
+    .toc { padding: 22px 24px; margin-bottom: 28px; border: 1px solid #cdeceb; }
+    .toc h3 { color: var(--teal-dark); font-size: 15px; margin-bottom: 10px; }
+    .toc ol { padding-left: 18px; }
+    .toc li { margin-bottom: 5px; font-size: 14px; }
+    .section { padding: 34px; margin-bottom: 26px; scroll-margin-top: 24px; }
+    .section-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .section-icon { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, var(--teal), var(--teal-dark)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    .section h2 { font-size: 23px; }
+    .intro { color: var(--gray-600); margin-bottom: 18px; }
+    .subsection { margin-top: 26px; }
+    .subsection-title { font-size: 15px; font-weight: 700; color: var(--gray-800); padding-bottom: 8px; border-bottom: 2px solid var(--gray-200); margin-bottom: 12px; }
+    .steps { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .steps li { display: flex; gap: 14px; background: var(--gray-100); border-radius: 12px; padding: 14px 16px; border-left: 4px solid var(--teal); }
+    .step-num { width: 28px; min-width: 28px; height: 28px; border-radius: 50%; background: var(--teal); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+    .step-body strong { display: block; color: var(--gray-800); font-size: 14px; }
+    .step-body p { color: var(--gray-600); font-size: 13px; margin-top: 3px; }
+    .callout { border-left: 4px solid; border-radius: 12px; padding: 14px 18px; margin: 16px 0; font-size: 14px; }
+    .callout strong { display: block; margin-bottom: 4px; }
+    .info { background: var(--teal-pale); border-color: var(--teal); color: #115e59; }
+    .warning { background: var(--amber-pale); border-color: var(--amber); color: #92400e; }
+    .danger { background: var(--red-pale); border-color: var(--red); color: #991b1b; }
+    .success { background: var(--green-pale); border-color: var(--green); color: #166534; }
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 14px; }
+    .feature-card { background: var(--gray-100); border-left: 4px solid var(--teal); border-radius: 12px; padding: 18px; }
+    .feature-card .fc-title { font-weight: 700; margin-bottom: 6px; }
+    .feature-card .fc-desc { font-size: 13px; color: var(--gray-600); }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+    thead th { background: var(--teal); color: #fff; text-align: left; padding: 11px 14px; }
+    tbody td { padding: 11px 14px; border-bottom: 1px solid var(--gray-200); color: var(--gray-600); }
+    tbody tr:last-child td { border-bottom: none; }
+    .chip-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .chip { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .chip-green { background: #dcfce7; color: #166534; }
+    .chip-red { background: #fee2e2; color: #991b1b; }
+    .chip-blue { background: #dbeafe; color: #1d4ed8; }
+    .chip-amber { background: #fef3c7; color: #92400e; }
+    footer { text-align: center; color: var(--gray-400); font-size: 13px; padding: 24px 0; }
+    @media (max-width: 820px) {
+      .sidebar { display: none; }
+      .main { max-width: 100%; padding: 20px 16px; }
+      .hero, .section { padding: 24px 18px; }
+      .hero h1 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="icon">A</div>
+      <span>Admin Portal Guide</span>
+    </div>
+    <div class="nav-label">Start</div>
+    <a class="nav-item active" href="#overview">Overview</a>
+    <a class="nav-item" href="#access">Login and Access</a>
+    <a class="nav-item" href="#dashboard">Dashboard</a>
+    <div class="nav-label">Operations</div>
+    <a class="nav-item" href="#sync">Sync Data</a>
+    <a class="nav-item" href="#devices">Devices</a>
+    <a class="nav-item" href="#users">Users</a>
+    <a class="nav-item" href="#approval">Approval Flow</a>
+    <div class="nav-label">Support</div>
+    <a class="nav-item" href="#troubleshooting">Troubleshooting</a>
+  </nav>
+
+  <main class="main">
+    <div class="hero">
+      <div class="hero-top">
+        <div class="icon">#</div>
+        <div><h1>Precision IoT Admin Portal</h1></div>
+      </div>
+      <p>Use this guide to manage devices, control user access, approve new credential users, and handle password reset links in the live admin portal.</p>
+      <div class="hero-meta">
+        <span>Admin Operations</span>
+        <span>Devices and Users</span>
+        <span>EC2 Runtime</span>
+        <span>Updated April 2026</span>
+      </div>
+    </div>
+
+    <div class="toc">
+      <h3>Quick Navigation</h3>
+      <ol>
+        <li><a href="#overview">What the portal is used for</a></li>
+        <li><a href="#access">Logging in and ending the session</a></li>
+        <li><a href="#dashboard">Reading dashboard totals</a></li>
+        <li><a href="#sync">Refreshing synced data</a></li>
+        <li><a href="#devices">Managing devices</a></li>
+        <li><a href="#users">Managing users</a></li>
+        <li><a href="#approval">Approving new email/password users</a></li>
+        <li><a href="#troubleshooting">Troubleshooting common issues</a></li>
+      </ol>
+    </div>
+
+    <div id="overview" class="section">
+      <div class="section-head">
+        <div class="section-icon">1</div>
+        <h2>Overview</h2>
+      </div>
+      <p class="intro">The admin portal is the control surface for monitoring system totals, refreshing synced records, managing user access, and controlling device availability.</p>
+      <div class="feature-grid">
+        <div class="feature-card"><div class="fc-title">Dashboard</div><div class="fc-desc">View totals for devices, active devices, users, and blocked users.</div></div>
+        <div class="feature-card"><div class="fc-title">Devices</div><div class="fc-desc">Restrict, allow, or delete device records from the backend.</div></div>
+        <div class="feature-card"><div class="fc-title">Users</div><div class="fc-desc">Block, unblock, edit display names, generate reset links, or delete user accounts.</div></div>
+        <div class="feature-card"><div class="fc-title">Sync</div><div class="fc-desc">Force a backend refresh when recently changed records are not visible yet.</div></div>
+      </div>
+    </div>
+
+    <div id="access" class="section">
+      <div class="section-head">
+        <div class="section-icon">2</div>
+        <h2>Login and Access</h2>
+      </div>
+      <div class="subsection">
+        <div class="subsection-title">Logging In</div>
+        <ul class="steps">
+          <li><div class="step-num">1</div><div class="step-body"><strong>Open the portal</strong><p>Open the admin portal URL in a browser.</p></div></li>
+          <li><div class="step-num">2</div><div class="step-body"><strong>Enter credentials</strong><p>Type the admin username and password configured on the EC2 server.</p></div></li>
+          <li><div class="step-num">3</div><div class="step-body"><strong>Open the portal</strong><p>After successful authentication, the portal loads the Dashboard tab.</p></div></li>
+        </ul>
+      </div>
+      <div class="subsection">
+        <div class="subsection-title">Logging Out</div>
+        <ul class="steps">
+          <li><div class="step-num">1</div><div class="step-body"><strong>Use logout</strong><p>Click the logout action in the portal.</p></div></li>
+          <li><div class="step-num">2</div><div class="step-body"><strong>Session clears</strong><p>The browser session is cleared and the login screen is shown again.</p></div></li>
+        </ul>
+      </div>
+      <div class="callout warning"><strong>Credential source</strong>Portal credentials are read from environment variables on the server, not from a user table inside the UI.</div>
+    </div>
+
+    <div id="dashboard" class="section">
+      <div class="section-head">
+        <div class="section-icon">3</div>
+        <h2>Dashboard</h2>
+      </div>
+      <p class="intro">The dashboard is the fastest way to see system-wide counts.</p>
+      <table>
+        <thead><tr><th>Card</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Total Devices</td><td>All known device records</td></tr>
+          <tr><td>Active Devices</td><td>Devices currently allowed</td></tr>
+          <tr><td>Total Users</td><td>All synced user records</td></tr>
+          <tr><td>Blocked Users</td><td>Users currently denied app access</td></tr>
+        </tbody>
+      </table>
+      <div class="chip-row">
+        <span class="chip chip-green">Active Devices</span>
+        <span class="chip chip-red">Blocked Users</span>
+        <span class="chip chip-blue">Synced Records</span>
+      </div>
+    </div>
+
+    <div id="sync" class="section">
+      <div class="section-head">
+        <div class="section-icon">4</div>
+        <h2>Sync Data</h2>
+      </div>
+      <p class="intro">Use the <strong>Sync Data</strong> button when you want a fresh backend read immediately instead of waiting for background refresh.</p>
+      <ul class="steps">
+        <li><div class="step-num">1</div><div class="step-body"><strong>Click Sync Data</strong><p>The portal starts a backend refresh request.</p></div></li>
+        <li><div class="step-num">2</div><div class="step-body"><strong>Wait for status</strong><p>The UI shows a temporary sync-in-progress message.</p></div></li>
+        <li><div class="step-num">3</div><div class="step-body"><strong>Review results</strong><p>When finished, the portal reloads dashboard totals plus the current users and devices lists.</p></div></li>
+      </ul>
+      <div class="callout success"><strong>When to use it</strong>Use sync after a recent app sign-up, unblock action, device change, or backend reconciliation event.</div>
+    </div>
+
+    <div id="devices" class="section">
+      <div class="section-head">
+        <div class="section-icon">5</div>
+        <h2>Managing Devices</h2>
+      </div>
+      <p class="intro">The Devices tab lists each device ID, name, location, status, last seen timestamp, and available actions.</p>
+      <div class="subsection">
+        <div class="subsection-title">Statuses</div>
+        <div class="chip-row">
+          <span class="chip chip-green">Active</span>
+          <span class="chip chip-amber">Restricted</span>
+        </div>
+      </div>
+      <div class="subsection">
+        <div class="subsection-title">Available Actions</div>
+        <ul class="steps">
+          <li><div class="step-num">1</div><div class="step-body"><strong>Restrict or Allow</strong><p>Click <strong>Restrict</strong> to disable an active device, or <strong>Allow</strong> to restore a restricted device.</p></div></li>
+          <li><div class="step-num">2</div><div class="step-body"><strong>Delete Device</strong><p>Click <strong>Delete</strong> and confirm when the device record should be removed completely.</p></div></li>
+        </ul>
+      </div>
+      <div class="callout danger"><strong>Delete carefully</strong>Deleting a device is more than a temporary restriction. Use restriction for reversible access control and deletion only for permanent removal.</div>
+    </div>
+
+    <div id="users" class="section">
+      <div class="section-head">
+        <div class="section-icon">6</div>
+        <h2>Managing Users</h2>
+      </div>
+      <p class="intro">The Users tab lists each user ID, email, display name, authentication type, account status, last login, and row-level actions.</p>
+      <table>
+        <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Auth Type</td><td><strong>Google</strong> or <strong>Email/Password</strong></td></tr>
+          <tr><td>Status</td><td><strong>Active</strong> means allowed, <strong>Blocked</strong> means denied</td></tr>
+          <tr><td>Last Login</td><td>Last known sign-in time or <strong>Never</strong></td></tr>
+        </tbody>
+      </table>
+      <div class="subsection">
+        <div class="subsection-title">Actions</div>
+        <ul class="steps">
+          <li><div class="step-num">1</div><div class="step-body"><strong>Block or Unblock</strong><p>Use these actions to deny or restore app access. Email/password sign-up users are initially blocked and must be unblocked before first login.</p></div></li>
+          <li><div class="step-num">2</div><div class="step-body"><strong>Edit Display Name</strong><p>Available for eligible email/password users. A browser prompt asks for the updated display name.</p></div></li>
+          <li><div class="step-num">3</div><div class="step-body"><strong>Forgot Password</strong><p>Available for eligible email/password users. The portal generates a password reset link that can be copied and shared.</p></div></li>
+          <li><div class="step-num">4</div><div class="step-body"><strong>Delete User</strong><p>Deletes the user from EC2-backed records. Use only for permanent account removal.</p></div></li>
+        </ul>
+      </div>
+      <div class="callout warning"><strong>Forgot Password limitations</strong>The reset-link action is not shown for Google users and is not shown for Gmail-address users on the password flow.</div>
+    </div>
+
+    <div id="approval" class="section">
+      <div class="section-head">
+        <div class="section-icon">7</div>
+        <h2>Email/Password Approval Flow</h2>
+      </div>
+      <p class="intro">Users created from the mobile app require explicit admin approval before first login.</p>
+      <ul class="steps">
+        <li><div class="step-num">1</div><div class="step-body"><strong>User signs up in the app</strong><p>The app creates the Firebase credential and sends the record to the backend.</p></div></li>
+        <li><div class="step-num">2</div><div class="step-body"><strong>Backend stores the user as blocked</strong><p>The account appears in the Users tab with blocked status by default.</p></div></li>
+        <li><div class="step-num">3</div><div class="step-body"><strong>Admin reviews the row</strong><p>Find the user in the Users tab and verify the email and display name.</p></div></li>
+        <li><div class="step-num">4</div><div class="step-body"><strong>Click Unblock</strong><p>This activates the account for sign-in.</p></div></li>
+        <li><div class="step-num">5</div><div class="step-body"><strong>User signs in</strong><p>The user can then log in with the same email and password from the app.</p></div></li>
+      </ul>
+      <div class="callout success"><strong>Expected state before approval</strong>If the user says sign-up succeeded but login is denied, the Users tab should still show that account as <strong>Blocked</strong> until you click <strong>Unblock</strong>.</div>
+    </div>
+
+    <div id="troubleshooting" class="section">
+      <div class="section-head">
+        <div class="section-icon">8</div>
+        <h2>Troubleshooting</h2>
+      </div>
+      <div class="subsection">
+        <div class="subsection-title">Login fails</div>
+        <p class="intro">Verify the admin username and password in the EC2 environment file and restart the PM2 process if credentials changed recently.</p>
+      </div>
+      <div class="subsection">
+        <div class="subsection-title">User remains blocked</div>
+        <p class="intro">Use <strong>Sync Data</strong>, refresh the Users tab, and verify the status actually changed from <strong>Blocked</strong> to <strong>Active</strong>.</p>
+      </div>
+      <div class="subsection">
+        <div class="subsection-title">Reset link option is missing</div>
+        <p class="intro">That action only appears for eligible non-Gmail email/password users.</p>
+      </div>
+      <div class="subsection">
+        <div class="subsection-title">Data looks stale</div>
+        <p class="intro">The portal auto-refreshes visible tab data roughly every 10 seconds, but you can still use <strong>Sync Data</strong> for an immediate backend refresh.</p>
+      </div>
+      <div class="callout info"><strong>Related runbook</strong>See <strong>change_admin_portal_password.md</strong> in the workspace root for admin credential change steps.</div>
+    </div>
+
+    <footer>Precision IoT Admin Portal Guide</footer>
+  </main>
+</div>
+</body>
+</html>

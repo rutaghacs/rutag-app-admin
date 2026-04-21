@@ -141,6 +141,23 @@
             background: #f8f9fa;
         }
 
+        #usersTableBody tr.user-row td {
+            border-bottom: 3px solid #d8e0ea;
+            transition: background-color 0.2s ease;
+        }
+
+        #usersTableBody tr.user-row-a td {
+            background: #f7fbff;
+        }
+
+        #usersTableBody tr.user-row-b td {
+            background: #f2f7fc;
+        }
+
+        #usersTableBody tr.user-row:hover td {
+            background: #eaf2fb;
+        }
+
         .btn {
             padding: 8px 16px;
             border: none;
@@ -190,61 +207,90 @@
             transform: scale(1.05);
         }
 
+        .btn-edit {
+            background: #2563eb;
+            color: white;
+        }
+
+        .icon-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+        }
+
+        .icon-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+            pointer-events: none;
+        }
+
+        .icon-btn[data-tooltip]::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 8px);
+            transform: translateX(-50%) translateY(4px);
+            padding: 6px 8px;
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.94);
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+            z-index: 10;
+        }
+
+        .icon-btn[data-tooltip]::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 2px);
+            transform: translateX(-50%) translateY(4px);
+            border-width: 6px 6px 0 6px;
+            border-style: solid;
+            border-color: rgba(15, 23, 42, 0.94) transparent transparent transparent;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+            z-index: 10;
+        }
+
+        .icon-btn:hover::after,
+        .icon-btn:hover::before,
+        .icon-btn:focus-visible::after,
+        .icon-btn:focus-visible::before {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .icon-btn:focus-visible {
+            outline: 2px solid #bfdbfe;
+            outline-offset: 2px;
+        }
+
+        .btn-delete {
+            background: #b91c1c;
+            color: white;
+        }
+
+        .btn-edit:hover, .btn-delete:hover {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
+
         .action-buttons {
             display: flex;
             align-items: center;
             gap: 8px;
             flex-wrap: wrap;
-        }
-
-        .users-tools {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            padding: 16px;
-            margin-bottom: 14px;
-        }
-
-        .users-tools h3 {
-            margin-bottom: 10px;
-            font-size: 16px;
-            color: #1f2937;
-        }
-
-        .create-user-form {
-            display: grid;
-            grid-template-columns: 2fr 2fr 2fr auto;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .create-user-form input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        .create-user-form button {
-            background: #0f766e;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-size: 14px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        .create-user-form button:hover {
-            opacity: 0.92;
-        }
-
-        @media (max-width: 1024px) {
-            .create-user-form {
-                grid-template-columns: 1fr;
-            }
         }
 
         .status-badge {
@@ -436,6 +482,21 @@
             cursor: not-allowed;
         }
 
+        .guide-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .guide-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
         .sync-status {
             font-size: 12px;
             opacity: 0.95;
@@ -466,6 +527,7 @@
         <h1 style="display:inline">🔧 Sensor Admin Portal</h1>
         <div class="header-actions">
             <span id="syncStatus" class="sync-status"></span>
+            <button class="guide-btn" onclick="openUserGuide()">User Guide</button>
             <button class="sync-btn" id="syncBtn" onclick="manualSync()">Sync Data</button>
             <button class="logout-btn" onclick="doLogout()">Logout</button>
         </div>
@@ -523,15 +585,6 @@
 
         <!-- USERS TAB -->
         <div id="users" class="tab-content">
-            <div class="users-tools">
-                <h3>Create Email/Password Account</h3>
-                <div class="create-user-form">
-                    <input type="email" id="createUserEmail" placeholder="user@example.com" />
-                    <input type="text" id="createUserDisplayName" placeholder="Display name" />
-                    <input type="password" id="createUserPassword" placeholder="Temporary password" />
-                    <button onclick="createPasswordAccount()">Create Account</button>
-                </div>
-            </div>
             <div class="table-container">
                 <table>
                     <thead>
@@ -607,6 +660,10 @@
             document.getElementById('loginPassword').value = '';
             document.getElementById('syncStatus').textContent = '';
             showLogin();
+        }
+
+        function openUserGuide() {
+            window.open('/admin-portal-user-guide', '_blank');
         }
 
         async function manualSync() {
@@ -723,10 +780,15 @@
                         </td>
                         <td>${device.last_seen ? new Date(device.last_seen).toLocaleString() : 'Never'}</td>
                         <td>
-                            <button class="btn btn-toggle ${device.is_active ? '' : 'disabled'}" 
-                                    onclick="toggleDevice('${device.device_id}')">
-                                ${device.is_active ? 'Restrict' : 'Allow'}
-                            </button>
+                            <div class="action-buttons">
+                                <button class="btn btn-toggle ${device.is_active ? '' : 'disabled'}" 
+                                        onclick="toggleDevice('${device.device_id}')">
+                                    ${device.is_active ? 'Restrict' : 'Allow'}
+                                </button>
+                                <button class="btn btn-delete" onclick="deleteDevice('${device.device_id}')">
+                                    Delete
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `).join('');
@@ -772,8 +834,8 @@
                     return;
                 }
 
-                tbody.innerHTML = users.map(user => `
-                    <tr>
+                tbody.innerHTML = users.map((user, index) => `
+                    <tr class="user-row ${index % 2 === 0 ? 'user-row-a' : 'user-row-b'}">
                         <td>${user.user_id}</td>
                         <td>${user.email}</td>
                         <td>${user.display_name || 'N/A'}</td>
@@ -790,11 +852,41 @@
                                         onclick="toggleUserBlock('${user.user_id}')">
                                     ${user.is_blocked ? 'Unblock' : 'Block'}
                                 </button>
-                                ${user.auth_provider === 'password' ? `
-                                    <button class="btn btn-reset" onclick="generateResetLink('${user.user_id}', '${user.email}')">
-                                        Forgot Password
+                                ${user.auth_provider === 'password' && !/@(?:gmail|googlemail)\.com$/i.test(user.email || '') ? `
+                                    <button
+                                        class="btn btn-edit icon-btn"
+                                        type="button"
+                                        data-tooltip="Edit display name"
+                                        title="Edit display name"
+                                        aria-label="Edit display name"
+                                        onclick="editUserDisplayName('${user.user_id}', '${(user.display_name || '').replace(/'/g, "\\'")}')">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0L14.84 5.24l3.75 3.75 2.12-1.78z" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        class="btn btn-reset icon-btn"
+                                        type="button"
+                                        data-tooltip="Send password reset link"
+                                        title="Send password reset link"
+                                        aria-label="Send password reset link"
+                                        onclick="forgotPassword('${user.user_id}', '${user.email || ''}')">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <path d="M22 5h-7.586l-1.707-1.707A.997.997 0 0 0 12 3H5c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h14c1.103 0 2-.897 2-2V6c0-.553-.447-1-1-1zm-8.293 10.707-2 2a.999.999 0 1 1-1.414-1.414L10.586 16H8a1 1 0 1 1 0-2h2.586l-.293-.293a.999.999 0 1 1 1.414-1.414l2 2a.999.999 0 0 1 0 1.414zM16 12a1 1 0 1 1 0-2h1V8a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1h-2z" />
+                                        </svg>
                                     </button>
                                 ` : ''}
+                                <button
+                                    class="btn btn-delete icon-btn"
+                                    type="button"
+                                    data-tooltip="Delete user"
+                                    title="Delete user"
+                                    aria-label="Delete user"
+                                    onclick="deleteUser('${user.user_id}', '${user.email}')">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                        <path d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7h1a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9zm1 2h4v1h-4V5zm-1 5a1 1 0 0 1 2 0v6a1 1 0 1 1-2 0v-6zm4 0a1 1 0 0 1 2 0v6a1 1 0 1 1-2 0v-6z" />
+                                    </svg>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -805,48 +897,40 @@
             }
         }
 
-        async function createPasswordAccount() {
-            const email = document.getElementById('createUserEmail').value.trim().toLowerCase();
-            const displayName = document.getElementById('createUserDisplayName').value.trim();
-            const password = document.getElementById('createUserPassword').value;
-
-            if (!email || !password) {
-                alert('Email and password are required');
+        async function editUserDisplayName(userId, existingDisplayName) {
+            const nextDisplayName = prompt('Enter updated display name:', existingDisplayName || '');
+            if (nextDisplayName === null) {
                 return;
             }
 
-            if (password.length < 6) {
-                alert('Password must be at least 6 characters');
+            const trimmed = nextDisplayName.trim();
+            if (!trimmed) {
+                alert('Display name cannot be empty.');
                 return;
             }
 
             try {
-                const response = await fetch(`${API_BASE}/users/create-password-account`, {
-                    method: 'POST',
+                const response = await fetch(`${API_BASE}/users/${userId}/display-name`, {
+                    method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, displayName, password })
+                    body: JSON.stringify({ displayName: trimmed })
                 });
-
                 const result = await response.json();
+
                 if (!response.ok) {
-                    alert(result.error || 'Failed to create account');
+                    alert(result.error || 'Failed to update display name');
                     return;
                 }
 
-                alert(`Account created for ${result.user.email}`);
-                document.getElementById('createUserEmail').value = '';
-                document.getElementById('createUserDisplayName').value = '';
-                document.getElementById('createUserPassword').value = '';
                 loadUsers();
-                loadDashboard();
             } catch (error) {
-                console.error('Create password account failed:', error);
-                alert('Failed to create account');
+                console.error('Failed to edit display name:', error);
+                alert('Failed to update display name');
             }
         }
 
-        async function generateResetLink(userId, email) {
-            if (!confirm(`Generate password reset link for ${email}?`)) {
+        async function forgotPassword(userId, email) {
+            if (!confirm(`Generate a password reset link for ${email}?`)) {
                 return;
             }
 
@@ -861,16 +945,68 @@
                     return;
                 }
 
-                const resetLink = result.resetLink;
-                if (navigator.clipboard?.writeText) {
-                    await navigator.clipboard.writeText(resetLink);
-                    alert(`Reset link copied to clipboard for ${result.email}`);
+                const link = result.resetLink || '';
+                if (link) {
+                    try {
+                        await navigator.clipboard.writeText(link);
+                        alert(`Reset link copied to clipboard for ${result.email}.\n\nShare this link with the user.`);
+                    } catch (_) {
+                        prompt(`Copy and share this reset link for ${result.email}:`, link);
+                    }
                 } else {
-                    prompt(`Copy reset link for ${result.email}:`, resetLink);
+                    alert('Reset link was not returned by server.');
                 }
             } catch (error) {
-                console.error('Generate reset link failed:', error);
+                console.error('Failed to generate reset link:', error);
                 alert('Failed to generate reset link');
+            }
+        }
+
+        async function deleteUser(userId, email) {
+            if (!confirm(`Delete user ${email}? This will remove account data from EC2 and Firebase.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/users/${userId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    alert(result.error || 'Failed to delete user');
+                    return;
+                }
+
+                loadUsers();
+                loadDashboard();
+            } catch (error) {
+                console.error('Failed to delete user:', error);
+                alert('Failed to delete user');
+            }
+        }
+
+        async function deleteDevice(deviceId) {
+            if (!confirm(`Delete device ${deviceId}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/devices/${deviceId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    alert(result.error || 'Failed to delete device');
+                    return;
+                }
+
+                loadDevices();
+                loadDashboard();
+            } catch (error) {
+                console.error('Failed to delete device:', error);
+                alert('Failed to delete device');
             }
         }
 

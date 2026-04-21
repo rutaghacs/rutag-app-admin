@@ -11,6 +11,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const FIREBASE_SYNC_INTERVAL_MS = parseInt(process.env.FIREBASE_SYNC_INTERVAL_MS || '15000', 10);
+const FIREBASE_SYNC_ENABLED = (process.env.FIREBASE_SYNC_ENABLED || 'true').toLowerCase() === 'true';
 
 let firebaseDb = null;
 let firebaseInitialized = false;
@@ -68,6 +69,11 @@ function parseServiceAccount() {
 }
 
 function initializeFirebase() {
+  if (!FIREBASE_SYNC_ENABLED) {
+    console.log('[Firebase] Sync disabled via FIREBASE_SYNC_ENABLED=false. Running PostgreSQL-only mode.');
+    return;
+  }
+
   try {
     const serviceAccount = parseServiceAccount();
     if (!serviceAccount) {
@@ -213,6 +219,13 @@ async function syncDevicesFromFirebase() {
 }
 
 async function runFirebaseSync(force = false) {
+  if (!FIREBASE_SYNC_ENABLED) {
+    return {
+      skipped: true,
+      reason: 'Firebase sync is disabled',
+    };
+  }
+
   const now = Date.now();
   if (!firebaseInitialized || !firebaseDb) {
     return {
@@ -325,7 +338,7 @@ app.get('/api/auth/status', (req, res) => {
 
 app.post('/api/users/sync', async (req, res) => {
   try {
-    const { userId, email, displayName, authProvider } = req.body;
+    const { userId, email, displayName, authProvider, createdViaSignup = false } = req.body;
 
     if (!userId || !email) {
       return res.status(400).json({
@@ -333,23 +346,40 @@ app.post('/api/users/sync', async (req, res) => {
       });
     }
 
+    // Any account created through in-app sign-up must remain blocked until
+    // explicitly activated by an admin in the portal.
+    const shouldDefaultBlocked = createdViaSignup === true;
+
     const query = `
       INSERT INTO app_users (user_id, email, display_name, auth_provider, is_blocked, last_login, created_at, updated_at)
-      VALUES ($1, $2, $3, COALESCE($4, 'google'), false, NOW(), NOW(), NOW())
+      VALUES ($1, $2, $3, COALESCE($4, 'google'), $5, NOW(), NOW(), NOW())
       ON CONFLICT (user_id) DO UPDATE
       SET email = EXCLUDED.email,
           display_name = COALESCE(EXCLUDED.display_name, app_users.display_name),
           auth_provider = COALESCE(app_users.auth_provider, EXCLUDED.auth_provider, 'google'),
+          is_blocked = CASE
+            WHEN $5 = true THEN true
+            ELSE app_users.is_blocked
+          END,
           last_login = NOW(),
           updated_at = NOW()
       RETURNING user_id, email, display_name, is_blocked, created_at, last_login, updated_at
     `;
 
-    const result = await pool.query(query, [userId, email, displayName || email, authProvider || 'google']);
+    const result = await pool.query(query, [
+      userId,
+      email,
+      displayName || email,
+      authProvider || 'google',
+      shouldDefaultBlocked,
+    ]);
 
     res.json({
+      acknowledged: true,
       success: true,
       message: 'User synced successfully',
+      newUserCredentialReceived: createdViaSignup === true,
+      activationStatus: result.rows[0]?.is_blocked ? 'blocked_pending_admin_approval' : 'active',
       user: result.rows[0]
     });
   } catch (error) {
@@ -362,6 +392,54 @@ app.post('/api/users/sync', async (req, res) => {
     res.status(500).json({
       error: 'Failed to sync user',
       message: error.message
+    });
+  }
+});
+
+app.post('/api/users/access-status', async (req, res) => {
+  try {
+    const userId = (req.body?.userId || '').trim();
+    const email = (req.body?.email || '').trim().toLowerCase();
+
+    if (!userId && !email) {
+      return res.status(400).json({
+        exists: false,
+        isBlocked: true,
+        error: 'Missing userId or email'
+      });
+    }
+
+    const query = userId
+      ? 'SELECT user_id, email, is_blocked FROM app_users WHERE user_id = $1 LIMIT 1'
+      : 'SELECT user_id, email, is_blocked FROM app_users WHERE LOWER(email) = $1 LIMIT 1';
+    const values = userId ? [userId] : [email];
+
+    const result = await pool.query(query, values);
+    if (result.rows.length === 0) {
+      return res.json({
+        exists: false,
+        isBlocked: true,
+        blocked: true,
+        message: 'Account not found or pending admin approval.'
+      });
+    }
+
+    const user = result.rows[0];
+    const blocked = user.is_blocked === true;
+    return res.json({
+      exists: true,
+      userId: user.user_id,
+      email: user.email,
+      isBlocked: blocked,
+      blocked,
+      message: blocked ? 'Account is pending admin approval.' : 'Account is active'
+    });
+  } catch (error) {
+    console.error('Access-status error:', error);
+    return res.status(500).json({
+      exists: false,
+      isBlocked: true,
+      error: 'Failed to verify access status'
     });
   }
 });
@@ -652,6 +730,11 @@ app.post('/api/users/:userId/generate-reset-link', requireAuth, async (req, res)
       return res.status(400).json({ error: 'Reset password is only available for email/password accounts' });
     }
 
+    const isGmail = /@(?:gmail|googlemail)\.com$/i.test(String(user.email || ''));
+    if (isGmail) {
+      return res.status(400).json({ error: 'Forgot password is only available for non-Gmail users' });
+    }
+
     const resetLink = await admin.auth().generatePasswordResetLink(user.email);
     return res.json({ success: true, email: user.email, resetLink });
   } catch (error) {
@@ -685,6 +768,134 @@ app.put('/api/users/:userId/toggle-block', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Toggle user block error:', error);
     res.status(500).json({ error: 'Failed to toggle user block status' });
+  }
+});
+
+app.put('/api/users/:userId/display-name', requireAuth, async (req, res) => {
+  const { userId } = req.params;
+  const displayName = (req.body?.displayName || '').trim();
+
+  if (!displayName) {
+    return res.status(400).json({ error: 'displayName is required' });
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        UPDATE app_users
+        SET display_name = $1,
+            updated_at = NOW()
+        WHERE user_id = $2
+        RETURNING user_id, email, display_name, auth_provider, is_blocked
+      `,
+      [displayName, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (firebaseInitialized) {
+      try {
+        await admin.auth().updateUser(userId, { displayName });
+      } catch (error) {
+        console.warn(`[User display-name] Firebase Auth update skipped for ${userId}: ${error.message}`);
+      }
+
+      try {
+        await firebaseDb.collection('users').doc(userId).set({
+          displayName,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      } catch (error) {
+        console.warn(`[User display-name] Firestore update skipped for ${userId}: ${error.message}`);
+      }
+    }
+
+    return res.json({ success: true, user: result.rows[0] });
+  } catch (error) {
+    console.error('Update display name error:', error);
+    return res.status(500).json({ error: 'Failed to update display name' });
+  }
+});
+
+app.delete('/api/users/:userId', requireAuth, async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const deleteResult = await pool.query(
+      `
+        DELETE FROM app_users
+        WHERE user_id = $1
+        RETURNING user_id, email
+      `,
+      [userId]
+    );
+
+    if (deleteResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (firebaseInitialized) {
+      try {
+        await admin.auth().deleteUser(userId);
+      } catch (error) {
+        if (error?.code !== 'auth/user-not-found') {
+          console.warn(`[User delete] Firebase Auth delete skipped for ${userId}: ${error.message}`);
+        }
+      }
+
+      try {
+        await firebaseDb.collection('users').doc(userId).delete();
+      } catch (error) {
+        console.warn(`[User delete] Firestore delete skipped for ${userId}: ${error.message}`);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: 'User deleted from EC2 and Firebase',
+      user: deleteResult.rows[0]
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    return res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+app.delete('/api/devices/:deviceId', requireAuth, async (req, res) => {
+  const { deviceId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `
+        DELETE FROM devices
+        WHERE device_id = $1
+        RETURNING device_id, device_name, location
+      `,
+      [deviceId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    if (firebaseInitialized) {
+      try {
+        await firebaseDb.collection('devices').doc(deviceId).delete();
+      } catch (error) {
+        console.warn(`[Device delete] Firestore delete skipped for ${deviceId}: ${error.message}`);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: 'Device deleted from EC2 and Firebase',
+      device: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Delete device error:', error);
+    return res.status(500).json({ error: 'Failed to delete device' });
   }
 });
 
@@ -733,7 +944,14 @@ app.get('/api/check-access/:userId/:deviceId', requireApiKey, async (req, res) =
       [userId]
     );
 
-    if (userResult.rows.length > 0 && userResult.rows[0].is_blocked === true) {
+    if (userResult.rows.length === 0) {
+      return res.json({
+        hasAccess: false,
+        reason: 'User not found'
+      });
+    }
+
+    if (userResult.rows[0].is_blocked === true) {
       return res.json({
         hasAccess: false,
         reason: 'User is blocked'
@@ -760,6 +978,26 @@ app.get('/api/check-access/:userId/:deviceId', requireApiKey, async (req, res) =
       });
     }
 
+    const membershipResult = await pool.query(
+      `
+      SELECT 1
+      FROM device_user_membership
+      WHERE user_id = $1
+        AND device_id = $2
+        AND is_active = true
+      LIMIT 1
+      `,
+      [userId, deviceId]
+    );
+
+    if (membershipResult.rows.length === 0) {
+      return res.json({
+        hasAccess: false,
+        reason: 'User does not have active device membership',
+        device: deviceResult.rows[0]
+      });
+    }
+
     res.json({
       hasAccess: true,
       accessLevel: 'default',
@@ -778,10 +1016,19 @@ app.get('/api/check-access/:userId/:deviceId', requireApiKey, async (req, res) =
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ status: 'healthy', database: 'connected' });
+    res.json({
+      status: 'healthy',
+      database: 'connected',
+      firebaseSyncEnabled: FIREBASE_SYNC_ENABLED,
+      firebaseInitialized,
+    });
   } catch (error) {
     res.status(500).json({ status: 'unhealthy', database: 'disconnected' });
   }
+});
+
+app.get('/admin-portal-user-guide', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin-portal-user-guide.html'));
 });
 
 // Serve frontend
@@ -801,6 +1048,7 @@ async function startServer() {
   app.listen(PORT, () => {
     console.log(`Admin Portal running on http://localhost:${PORT}`);
     console.log(`Dashboard: http://localhost:${PORT}`);
+    console.log(`[Mode] FIREBASE_SYNC_ENABLED=${FIREBASE_SYNC_ENABLED}`);
   });
 }
 
